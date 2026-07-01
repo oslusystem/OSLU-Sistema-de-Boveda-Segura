@@ -1,0 +1,12 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/lib", "src/types"],
+  "entryPointStrategy": "expand",
+  "out": "docs-site",
+  "tsconfig": "tsconfig.json",
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "readme": "none",
+  "name": "OSLU — Sistema de Bóveda Segura (documentación interna)",
+  "githubPages": false
+}
