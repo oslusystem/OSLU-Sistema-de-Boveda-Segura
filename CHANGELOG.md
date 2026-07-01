@@ -57,3 +57,4 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 15 | JSDoc completo en `src/lib` | Docs |
 | 16 | Diagrama ER + diagrama de secuencia MFA (Mermaid) | Docs |
 | 17 | `CHANGELOG.md` | Docs |
+| 18 | Badge de estado de CI en el README | Docs |

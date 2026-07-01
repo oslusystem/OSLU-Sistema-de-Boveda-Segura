@@ -1,5 +1,7 @@
 # 🔐 OSLU — Sistema de Bóveda Segura
 
+[![CI](https://github.com/oslusystem/OSLU-Sistema-de-Boveda-Segura/actions/workflows/ci.yml/badge.svg)](https://github.com/oslusystem/OSLU-Sistema-de-Boveda-Segura/actions/workflows/ci.yml)
+
 **OSLU** es una bóveda documental para información sensible: cada archivo se
 cifra individualmente, cada acceso pasa por tres barreras de seguridad
 (usuario activo, clasificación y necesidad de saber) y cada acción —subida,
