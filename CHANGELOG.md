@@ -11,9 +11,12 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 - Generación de documentación técnica estática con TypeDoc (`npm run docs`) a partir
   de los comentarios JSDoc de `src/lib` y `src/types` (Tarea #14).
 - JSDoc completo en `src/lib/utils.ts` y `src/lib/prisma.ts` (Tarea #15).
-- Diagrama entidad-relación y diagrama de secuencia del login MFA en Mermaid, en el
-  README principal (Tarea #16).
 - Este `CHANGELOG.md` con la tabla de referencia de tareas (Tarea #17).
+
+### Removed
+- Diagrama entidad-relación y diagrama de secuencia del login MFA en el README
+  principal: se agregaron y luego se retiraron para dejar sólo el diagrama de
+  arquitectura general (Tarea #16/#19).
 
 ### Verified
 - 16 pruebas unitarias reales en `tests/` (crypto, auth, audit, face) — supera el
@@ -55,6 +58,7 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 13 | Módulo Bóveda: proyectos, archivos, `DocumentTable`, `StorageStats` | Producto |
 | 14 | Documentación técnica autogenerada (TypeDoc) | Docs |
 | 15 | JSDoc completo en `src/lib` | Docs |
-| 16 | Diagrama ER + diagrama de secuencia MFA (Mermaid) | Docs |
+| 16 | Diagrama ER + diagrama de secuencia MFA (Mermaid) — agregado y luego retirado | Docs |
 | 17 | `CHANGELOG.md` | Docs |
 | 18 | Badge de estado de CI en el README | Docs |
+| 19 | Quitar diagrama ER y de secuencia MFA del README | Docs |
