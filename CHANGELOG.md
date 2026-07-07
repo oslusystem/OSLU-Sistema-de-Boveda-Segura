@@ -62,3 +62,4 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 17 | `CHANGELOG.md` | Docs |
 | 18 | Badge de estado de CI en el README | Docs |
 | 19 | Quitar diagrama ER y de secuencia MFA del README | Docs |
+| 20 | `CONTRIBUTORS.md` base | Docs |
