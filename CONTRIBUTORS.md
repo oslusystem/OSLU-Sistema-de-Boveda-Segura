@@ -7,3 +7,4 @@ primera contribución. Para sumarte, abre un Pull Request añadiendo tu línea
 | Usuario de GitHub | Rol |
 |---|---|
 | [@oslusystem](https://github.com/oslusystem) | Mantenedor |
+| [@osmaneduardo2232-prog](https://github.com/osmaneduardo2232-prog) | Colaborador |
