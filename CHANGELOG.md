@@ -8,31 +8,35 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 ## [Avance #5] — Despliegue y auto-recuperación
 
 ### Added
-- `Dockerfile` multi-stage (`node:20-bookworm-slim`): build standalone de
-  Next.js + CLI de Prisma en la imagen final, con `HEALTHCHECK` nativo contra
-  `/api/health` (Tarea #22).
-- `docker-entrypoint.sh`: aplica `prisma migrate deploy` y las reglas de
-  inmutabilidad de la bitácora en cada arranque, antes de levantar el
-  servidor (Tarea #22).
 - Endpoint `GET /api/health` (`src/app/api/health/route.ts`): verifica
-  conexión a la base de datos, usado por el healthcheck de Railway/Docker y
-  como ruta pública en `middleware.ts` (Tarea #22).
-- `railway.json`: healthcheck + `restartPolicyType: ON_FAILURE` (self-healing
-  ante fallas críticas) (Tarea #22).
-- `docker-compose.yml`: entorno local (app + Postgres) para probar el
-  artefacto de producción antes de desplegar, con `restart: unless-stopped`
-  explícito (Tarea #22).
-- Job `deploy` en `.github/workflows/ci.yml`: se dispara sólo al fusionar un
-  Pull Request a `main` (CI en verde) y despliega a Railway sin intervención
-  manual — evolución del pipeline del Avance #3 (Tarea #22).
+  conexión a la base de datos; ruta pública en `middleware.ts`, usada como
+  healthcheck y como primer paso de diagnóstico ante incidentes (Tarea #22).
 - Colaborador `osmaneduardo2232-prog` agregado a `CONTRIBUTORS.md` con su
   propio commit, y protección de `main` actualizada para exigir 1 aprobación
   real (peer review) además de CI en verde (Tarea #21).
+- `src/lib/storage.ts`: capa de almacenamiento sobre **Vercel Blob** para los
+  archivos cifrados (`storeEncrypted`/`readEncrypted`/`deleteEncrypted`),
+  usada por las 4 rutas que antes leían/escribían `storage/vault/` en disco
+  (Tarea #24).
+- `prisma/schema.prisma`: `directUrl` además de `url` en el datasource — Neon
+  requiere una conexión directa (sin PgBouncer) para migrar (Tarea #24).
+- Job `deploy` en `.github/workflows/ci.yml`: se dispara sólo al fusionar un
+  Pull Request a `main` (CI en verde), aplica `prisma migrate deploy` contra
+  Neon y publica el build en Vercel — sin intervención manual, evolución del
+  pipeline del Avance #3 (Tarea #24).
+
+### Changed
+- **Pivote de infraestructura: Railway (Docker) → Vercel + Neon + Vercel
+  Blob.** Railway exige tarjeta/plan pago (Hobby, ~$5/mes) para tokens de
+  proyecto, dominios y volúmenes persistentes más allá del trial; se optó por
+  una combinación 100% gratuita y sin tarjeta. Esto retira el `Dockerfile`,
+  `docker-entrypoint.sh`, `docker-compose.yml` y `railway.json` agregados
+  originalmente en la Tarea #22 (superados), y `output: 'standalone'` de
+  `next.config.ts` (innecesario/desaconsejado en Vercel) (Tarea #24).
 
 ### Fixed
 - `next` actualizado de `15.1.0` a `15.5.20`: la versión anterior tenía un CVE
-  crítico (`CVE-2025-66478`) y varios de severidad alta/media; Railway
-  bloqueaba el despliegue por esto (Tarea #23).
+  crítico (`CVE-2025-66478`) y varios de severidad alta/media (Tarea #23).
 
 ## [Avance #4] — Prototipo inicial viable
 
@@ -93,5 +97,6 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 19 | Quitar diagrama ER y de secuencia MFA del README | Docs |
 | 20 | `CONTRIBUTORS.md` base | Docs |
 | 21 | Agregar a osmaneduardo2232-prog como colaborador + exigir 1 aprobación en `main` | DevOps |
-| 22 | Despliegue en Railway: Dockerfile, `/api/health`, self-healing, CD automatizado | DevOps |
+| 22 | `/api/health` + intento inicial de despliegue en Railway (superado por Tarea #24) | DevOps |
 | 23 | Actualizar Next.js a 15.5.20 (CVEs críticos en 15.1.0) | Seguridad |
+| 24 | Pivote a Vercel + Neon + Vercel Blob: storage.ts, directUrl, CD sin Docker | DevOps |
