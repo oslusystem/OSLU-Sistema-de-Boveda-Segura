@@ -154,7 +154,7 @@ npx prisma migrate dev --name <nombre>   # nueva migración
 
 ## 🚀 Despliegue
 
-**Sistema en producción:** _pendiente — se agrega el enlace al desplegar en Netlify (Tarea #25)._
+**Sistema en producción:** https://oslu-sistema-boveda.netlify.app
 
 El sistema corre en producción sobre **Netlify** (build serverless inmutable a
 partir del código fuente, runtime de Next.js zero-config) + **Neon**
