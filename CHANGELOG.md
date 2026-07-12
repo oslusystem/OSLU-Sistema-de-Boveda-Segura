@@ -44,6 +44,11 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 ### Fixed
 - `next` actualizado de `15.1.0` a `15.5.20`: la versión anterior tenía un CVE
   crítico (`CVE-2025-66478`) y varios de severidad alta/media (Tarea #23).
+- `prisma/schema.prisma`: `binaryTargets = ["native", "rhel-openssl-3.0.x"]`.
+  El primer deploy en Netlify fallaba (`/api/health` y login devolvían error)
+  porque el motor de Prisma se había generado sólo para Windows; sin el
+  target del runtime de las funciones serverless de Netlify (Amazon Linux),
+  el cliente no encuentra el Query Engine en producción (Tarea #26).
 
 ## [Avance #4] — Prototipo inicial viable
 
@@ -108,3 +113,4 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 23 | Actualizar Next.js a 15.5.20 (CVEs críticos en 15.1.0) | Seguridad |
 | 24 | Pivote a Vercel + Neon + Vercel Blob: storage.ts, directUrl, CD sin Docker (superado por Tarea #25) | DevOps |
 | 25 | Pivote a Netlify + Neon + Netlify Blobs (Vercel pidió verificación adicional) | DevOps |
+| 26 | Fix: `binaryTargets` de Prisma para el runtime serverless de Netlify | DevOps |
