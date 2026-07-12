@@ -13,7 +13,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" = el motor local (Windows en desarrollo); "rhel-openssl-3.0.x" =
+  // el runtime de las funciones serverless de Netlify (Amazon Linux).
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
