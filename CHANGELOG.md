@@ -5,6 +5,30 @@ Todos los commits del proyecto siguen [Conventional Commits](https://www.convent
 e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+## [Avance #5] — Despliegue y auto-recuperación
+
+### Added
+- `Dockerfile` multi-stage (`node:20-bookworm-slim`): build standalone de
+  Next.js + CLI de Prisma en la imagen final, con `HEALTHCHECK` nativo contra
+  `/api/health` (Tarea #22).
+- `docker-entrypoint.sh`: aplica `prisma migrate deploy` y las reglas de
+  inmutabilidad de la bitácora en cada arranque, antes de levantar el
+  servidor (Tarea #22).
+- Endpoint `GET /api/health` (`src/app/api/health/route.ts`): verifica
+  conexión a la base de datos, usado por el healthcheck de Railway/Docker y
+  como ruta pública en `middleware.ts` (Tarea #22).
+- `railway.json`: healthcheck + `restartPolicyType: ON_FAILURE` (self-healing
+  ante fallas críticas) (Tarea #22).
+- `docker-compose.yml`: entorno local (app + Postgres) para probar el
+  artefacto de producción antes de desplegar, con `restart: unless-stopped`
+  explícito (Tarea #22).
+- Job `deploy` en `.github/workflows/ci.yml`: se dispara sólo al fusionar un
+  Pull Request a `main` (CI en verde) y despliega a Railway sin intervención
+  manual — evolución del pipeline del Avance #3 (Tarea #22).
+- Colaborador `osmaneduardo2232-prog` agregado a `CONTRIBUTORS.md` con su
+  propio commit, y protección de `main` actualizada para exigir 1 aprobación
+  real (peer review) además de CI en verde (Tarea #21).
+
 ## [Avance #4] — Prototipo inicial viable
 
 ### Added
@@ -63,3 +87,5 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 18 | Badge de estado de CI en el README | Docs |
 | 19 | Quitar diagrama ER y de secuencia MFA del README | Docs |
 | 20 | `CONTRIBUTORS.md` base | Docs |
+| 21 | Agregar a osmaneduardo2232-prog como colaborador + exigir 1 aprobación en `main` | DevOps |
+| 22 | Despliegue en Railway: Dockerfile, `/api/health`, self-healing, CD automatizado | DevOps |
