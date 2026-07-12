@@ -51,7 +51,7 @@ jobs:
         run: npm run build
 
   deploy:
-    name: Desplegar a Vercel (producción)
+    name: Desplegar a Netlify (producción)
     needs: build-and-test
     # CD: sólo se dispara tras un push real a main (o sea, un PR ya mergeado),
     # nunca en un Pull Request abierto — así "aprobar y fusionar" es lo único
@@ -83,9 +83,11 @@ jobs:
       - name: Aplicar reglas de inmutabilidad de la bitácora
         run: npx prisma db execute --file prisma/immutability.sql --schema prisma/schema.prisma
 
-      - name: Desplegar a Vercel (build remoto + activación de producción)
-        run: npx vercel deploy --prod --token="$VERCEL_TOKEN" --yes
+      - name: Instalar Netlify CLI
+        run: npm install -g netlify-cli
+
+      - name: Desplegar a Netlify (build remoto + activación de producción)
+        run: netlify deploy --prod --build
         env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
