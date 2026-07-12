@@ -29,6 +29,11 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
   propio commit, y protección de `main` actualizada para exigir 1 aprobación
   real (peer review) además de CI en verde (Tarea #21).
 
+### Fixed
+- `next` actualizado de `15.1.0` a `15.5.20`: la versión anterior tenía un CVE
+  crítico (`CVE-2025-66478`) y varios de severidad alta/media; Railway
+  bloqueaba el despliegue por esto (Tarea #23).
+
 ## [Avance #4] — Prototipo inicial viable
 
 ### Added
@@ -89,3 +94,4 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 20 | `CONTRIBUTORS.md` base | Docs |
 | 21 | Agregar a osmaneduardo2232-prog como colaborador + exigir 1 aprobación en `main` | DevOps |
 | 22 | Despliegue en Railway: Dockerfile, `/api/health`, self-healing, CD automatizado | DevOps |
+| 23 | Actualizar Next.js a 15.5.20 (CVEs críticos en 15.1.0) | Seguridad |
