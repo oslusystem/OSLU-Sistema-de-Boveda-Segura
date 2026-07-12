@@ -116,6 +116,12 @@ node -e "console.log('MASTER_KEY=' + require('crypto').randomBytes(32).toString(
 node -e "console.log('HMAC_SECRET=' + require('crypto').randomBytes(32).toString('hex'))"
 ```
 
+> ⚠️ Los archivos subidos se guardan en **Vercel Blob** (`src/lib/storage.ts`),
+> no en disco local — incluso en desarrollo hace falta un `BLOB_READ_WRITE_TOKEN`
+> real. Se obtiene creando un Blob Store en el proyecto de Vercel (Storage →
+> Blob) y copiando el token, o ejecutando `vercel env pull .env.local` con el
+> proyecto ya vinculado (`vercel link`).
+
 ### Credenciales tras el seed
 
 | Usuario | Contraseña | Rol | Acreditación |
@@ -148,43 +154,35 @@ npx prisma migrate dev --name <nombre>   # nueva migración
 
 ## 🚀 Despliegue
 
-**Sistema en producción:** _pendiente — se agrega el enlace al desplegar en Railway (Tarea #22)._
+**Sistema en producción:** _pendiente — se agrega el enlace al desplegar en Vercel (Tarea #24)._
 
-El sistema corre en producción como un **artefacto Docker inmutable** (no en
-modo `next dev`), desplegado en [Railway](https://railway.app):
+El sistema corre en producción sobre **Vercel** (build serverless inmutable a
+partir del código fuente) + **Neon** (PostgreSQL serverless) + **Vercel Blob**
+(almacenamiento de los archivos cifrados, ya que el entorno serverless no
+tiene disco persistente):
 
-- **`Dockerfile`** — build multi-stage sobre `node:20-bookworm-slim`: la etapa
-  `builder` genera el cliente Prisma y el build standalone de Next.js; la
-  etapa `runner` sólo copia el artefacto final + el CLI de Prisma (necesario
-  para migrar en cada arranque). Incluye `HEALTHCHECK` nativo de Docker contra
-  `/api/health`.
-- **`docker-entrypoint.sh`** — en cada arranque del contenedor: aplica
-  `prisma migrate deploy`, reaplica las reglas de inmutabilidad de la
-  bitácora (`prisma/immutability.sql`, idempotente) y recién entonces levanta
-  el servidor.
-- **`railway.json`** — configura el healthcheck (`/api/health`) y la política
-  de reinicio automático ante fallas (`restartPolicyType: ON_FAILURE`,
-  equivalente a `restart: unless-stopped` en Docker/Compose) — self-healing
-  sin intervención manual.
+- **Artefacto inmutable**: cada despliegue es un build nuevo e inmutable de
+  Vercel a partir del commit exacto de `main`; no hay estado mutable en el
+  servidor entre despliegues.
+- **`src/lib/storage.ts`** — los blobs `.enc` (ya cifrados con AES-256-GCM por
+  `crypto.ts`, con nombre aleatorio impredecible) se guardan en Vercel Blob en
+  vez de en disco local; `archivos.ruta_cifrada` guarda la URL del blob en
+  vez de una ruta de archivo, sin exponerse nunca al cliente.
+- **`prisma/schema.prisma`** — `DATABASE_URL` (conexión *pooled* de Neon, la
+  usa la app en runtime) y `DIRECT_URL` (conexión directa, la usan las
+  migraciones).
+- **Self-healing**: al ser serverless, cada request corre en una función
+  aislada — un fallo en una invocación no tumba el servicio ni afecta a otras
+  peticiones (no hay un único proceso que "se caiga"). `GET /api/health`
+  sigue existiendo como endpoint de diagnóstico (verifica conexión a BD) para
+  monitoreo externo y como primera parada del `RUNBOOK.md` (Avance #6).
 - **Cero credenciales en el repo**: las variables de `.env.example` se
-  inyectan como variables de entorno directamente en Railway (nunca se sube
-  un `.env` real). `storage/vault/` vive en un volumen persistente montado en
-  el contenedor.
+  inyectan como variables de entorno directamente en Vercel (nunca se sube un
+  `.env` real).
 - **CD automatizado**: `.github/workflows/ci.yml` tiene un job `deploy` que
   se dispara únicamente cuando un Pull Request se fusiona a `main` (con CI en
-  verde) — construye y publica el artefacto en Railway sin pasos manuales.
-
-### Probar el artefacto de producción en local (antes de desplegar)
-
-```bash
-docker compose up -d --build
-curl http://localhost:3000/api/health   # {"status":"ok","db":"connected",...}
-docker compose down -v
-```
-
-`docker-compose.yml` es sólo para esta verificación local (Postgres +
-la imagen de producción); Railway no lo usa, construye directamente desde el
-`Dockerfile`.
+  verde) — aplica las migraciones contra Neon y publica el build en Vercel
+  sin pasos manuales.
 
 ---
 

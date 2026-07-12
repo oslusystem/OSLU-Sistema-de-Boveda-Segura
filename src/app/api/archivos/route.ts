@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import { join, extname } from 'path'
+import { extname } from 'path'
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_CLASIFICACION } from '@/lib/auth'
 import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from '@/lib/utils'
 import { generateFileKey, encryptBuffer, hashContent, wrapKey } from '@/lib/crypto'
+import { storeEncrypted } from '@/lib/storage'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { proyectosVisibles } from '@/lib/access'
-
-const UPLOAD_DIR = process.env.UPLOAD_DIR ?? './storage/vault'
 
 // ─── GET: listar archivos visibles para el usuario ────────────────────────────
 export async function GET(req: NextRequest) {
@@ -128,10 +126,7 @@ export async function POST(req: NextRequest) {
     const encrypted = encryptBuffer(original, fileKey)
     const claveCifrada = wrapKey(fileKey)
 
-    await mkdir(join(process.cwd(), UPLOAD_DIR), { recursive: true })
-    const storedName = `${randomUUID()}.enc`
-    const rutaCifrada = join(UPLOAD_DIR, storedName)
-    await writeFile(join(process.cwd(), rutaCifrada), encrypted)
+    const rutaCifrada = await storeEncrypted(`vault/${randomUUID()}.enc`, encrypted)
 
     // ── Persistir archivo + clave en una transacción ──────────────────────────
     const archivo = await prisma.archivo.create({
