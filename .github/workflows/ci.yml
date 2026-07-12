@@ -48,3 +48,23 @@ jobs:
 
       - name: Build de producción
         run: npm run build
+
+  deploy:
+    name: Desplegar a Railway (producción)
+    needs: build-and-test
+    # CD: sólo se dispara tras un push real a main (o sea, un PR ya mergeado),
+    # nunca en un Pull Request abierto — así "aprobar y fusionar" es lo único
+    # que activa el despliegue automático, sin intervención manual.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Instalar Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Desplegar (build remoto por Dockerfile + healthcheck + restart policy de railway.json)
+        run: railway up --service web --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

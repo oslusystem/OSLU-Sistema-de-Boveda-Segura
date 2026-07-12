@@ -146,6 +146,48 @@ npx prisma migrate dev --name <nombre>   # nueva migración
 
 ---
 
+## 🚀 Despliegue
+
+**Sistema en producción:** _pendiente — se agrega el enlace al desplegar en Railway (Tarea #22)._
+
+El sistema corre en producción como un **artefacto Docker inmutable** (no en
+modo `next dev`), desplegado en [Railway](https://railway.app):
+
+- **`Dockerfile`** — build multi-stage sobre `node:20-bookworm-slim`: la etapa
+  `builder` genera el cliente Prisma y el build standalone de Next.js; la
+  etapa `runner` sólo copia el artefacto final + el CLI de Prisma (necesario
+  para migrar en cada arranque). Incluye `HEALTHCHECK` nativo de Docker contra
+  `/api/health`.
+- **`docker-entrypoint.sh`** — en cada arranque del contenedor: aplica
+  `prisma migrate deploy`, reaplica las reglas de inmutabilidad de la
+  bitácora (`prisma/immutability.sql`, idempotente) y recién entonces levanta
+  el servidor.
+- **`railway.json`** — configura el healthcheck (`/api/health`) y la política
+  de reinicio automático ante fallas (`restartPolicyType: ON_FAILURE`,
+  equivalente a `restart: unless-stopped` en Docker/Compose) — self-healing
+  sin intervención manual.
+- **Cero credenciales en el repo**: las variables de `.env.example` se
+  inyectan como variables de entorno directamente en Railway (nunca se sube
+  un `.env` real). `storage/vault/` vive en un volumen persistente montado en
+  el contenedor.
+- **CD automatizado**: `.github/workflows/ci.yml` tiene un job `deploy` que
+  se dispara únicamente cuando un Pull Request se fusiona a `main` (con CI en
+  verde) — construye y publica el artefacto en Railway sin pasos manuales.
+
+### Probar el artefacto de producción en local (antes de desplegar)
+
+```bash
+docker compose up -d --build
+curl http://localhost:3000/api/health   # {"status":"ok","db":"connected",...}
+docker compose down -v
+```
+
+`docker-compose.yml` es sólo para esta verificación local (Postgres +
+la imagen de producción); Railway no lo usa, construye directamente desde el
+`Dockerfile`.
+
+---
+
 ## 📚 Documentación técnica
 
 El código se documenta a sí mismo con comentarios JSDoc en cada módulo y función

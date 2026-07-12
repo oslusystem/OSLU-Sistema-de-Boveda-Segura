@@ -1,0 +1,51 @@
+# docker-compose.yml — SOLO para probar el artefacto de producción en local
+# antes de desplegar (no se usa para desplegar a Railway). Las credenciales
+# de abajo son ficticias, iguales en espíritu a las de .github/workflows/ci.yml
+# — nunca uses estos valores en un entorno real.
+#
+# Uso:
+#   docker compose up -d --build
+#   curl http://localhost:3000/api/health
+#   docker compose down -v   # -v también borra el volumen de la BD de prueba
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: boveda
+      POSTGRES_PASSWORD: boveda_local_pw
+      POSTGRES_DB: sistema_boveda
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U boveda"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://boveda:boveda_local_pw@db:5432/sistema_boveda?schema=public"
+      JWT_SECRET: "docker-compose-local-jwt-secret-no-usar-en-produccion"
+      JWT_EXPIRES_IN: "8h"
+      MASTER_KEY: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      HMAC_SECRET: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      UPLOAD_DIR: "./storage/vault"
+      MAX_FILE_SIZE_MB: "50"
+      NEXT_PUBLIC_APP_NAME: "Bóveda Segura (local Docker)"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      NODE_ENV: "production"
+    volumes:
+      - vault_data:/app/storage/vault
+
+volumes:
+  db_data:
+  vault_data:
