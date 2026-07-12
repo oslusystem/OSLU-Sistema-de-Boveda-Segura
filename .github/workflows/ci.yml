@@ -16,6 +16,7 @@ jobs:
     # Las claves cumplen el formato exigido (64 hex) para que crypto/audit no fallen.
     env:
       DATABASE_URL: "postgresql://user:pass@localhost:5432/boveda?schema=public"
+      DIRECT_URL: "postgresql://user:pass@localhost:5432/boveda?schema=public"
       JWT_SECRET: "ci-jwt-secret-suficientemente-largo-para-pruebas"
       MASTER_KEY: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       HMAC_SECRET: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
@@ -48,3 +49,45 @@ jobs:
 
       - name: Build de producción
         run: npm run build
+
+  deploy:
+    name: Desplegar a Netlify (producción)
+    needs: build-and-test
+    # CD: sólo se dispara tras un push real a main (o sea, un PR ya mergeado),
+    # nunca en un Pull Request abierto — así "aprobar y fusionar" es lo único
+    # que activa el despliegue automático, sin intervención manual.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Migrar la base de datos de producción (Neon) ANTES de publicar el
+      # nuevo código — usa DIRECT_URL (conexión sin pooler, la que requiere
+      # el motor de migraciones de Prisma).
+      - name: Aplicar migraciones de Prisma (Neon)
+        run: npx prisma migrate deploy
+
+      - name: Aplicar reglas de inmutabilidad de la bitácora
+        run: npx prisma db execute --file prisma/immutability.sql --schema prisma/schema.prisma
+
+      - name: Instalar Netlify CLI
+        run: npm install -g netlify-cli
+
+      - name: Desplegar a Netlify (build remoto + activación de producción)
+        run: netlify deploy --prod --build
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

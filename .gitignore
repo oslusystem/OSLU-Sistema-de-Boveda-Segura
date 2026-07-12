@@ -52,6 +52,7 @@ npm-debug.log*
 # Los assets que sí usa la app viven en /public (LOGO.png, FONDO.png se versionan ahí).
 /Estructura base de datos.jpg
 /FASE #2 DESARROLLO, PRUEBAS Y DOCUMENTACION.pdf
+/FASE #3 SOBREVIVIR O MORIR.pdf
 /FONDO.png
 /Imagen 2.jpg
 /Imagen 3.jpg
@@ -62,3 +63,7 @@ npm-debug.log*
 
 # ─── Notas internas para el asistente de IA (no es documentación pública) ────
 /CLAUDE.md
+
+# Local Netlify folder
+.netlify
+deno.lock

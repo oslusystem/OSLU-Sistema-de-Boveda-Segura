@@ -1,0 +1,8 @@
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# El runtime de Next.js de Netlify se detecta automáticamente (zero-config)
+# para proyectos Next.js — no hace falta declarar plugins ni publish dir.

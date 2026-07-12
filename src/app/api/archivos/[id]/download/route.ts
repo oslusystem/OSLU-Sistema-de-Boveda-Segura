@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFile } from 'fs/promises'
-import { join } from 'path'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, verifyFileAccessToken } from '@/lib/auth'
 import { decryptBuffer, unwrapKey, hashContent } from '@/lib/crypto'
+import { readEncrypted } from '@/lib/storage'
 import { puedeAccederArchivo } from '@/lib/access'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 
@@ -49,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     // ── Descifrar: leer .enc → desenvolver clave → AES-GCM → verificar hash ────
-    const blob    = await readFile(join(process.cwd(), archivo.ruta_cifrada))
+    const blob    = await readEncrypted(archivo.ruta_cifrada)
     const fileKey = unwrapKey(archivo.clave.clave_cifrada)
     const plain   = decryptBuffer(blob, fileKey) // lanza si el authTag no valida
 

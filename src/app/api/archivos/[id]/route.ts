@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { unlink } from 'fs/promises'
-import { join } from 'path'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_CLASIFICACION } from '@/lib/auth'
 import { puedeAccederArchivo } from '@/lib/access'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
+import { deleteEncrypted } from '@/lib/storage'
 
 // ─── GET: metadatos de un archivo (sin contenido) ─────────────────────────────
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -146,10 +145,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const archivo = await prisma.archivo.findUnique({ where: { id } })
   if (!archivo) return NextResponse.json({ ok: false, error: 'No encontrado' }, { status: 404 })
 
-  // Purgar el archivo cifrado del disco; la fila se conserva como baja lógica
-  // para preservar la trazabilidad de auditoría.
+  // Purgar el blob cifrado; la fila se conserva como baja lógica para
+  // preservar la trazabilidad de auditoría.
   try {
-    await unlink(join(process.cwd(), archivo.ruta_cifrada))
+    await deleteEncrypted(archivo.ruta_cifrada)
   } catch { /* puede no existir ya */ }
 
   await prisma.archivo.update({ where: { id }, data: { estado: 'ELIMINADO' } })

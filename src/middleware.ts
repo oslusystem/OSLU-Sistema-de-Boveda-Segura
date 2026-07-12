@@ -13,7 +13,7 @@ import type { NextRequest } from 'next/server'
 import { TOKEN_COOKIE } from '@/lib/constants'
 export { TOKEN_COOKIE }
 
-const PUBLIC_ROUTES = ['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/mfa']
+const PUBLIC_ROUTES = ['/login', '/api/auth/login', '/api/auth/logout', '/api/auth/mfa', '/api/health']
 const ADMIN_ROUTES  = ['/usuarios', '/api/usuarios', '/auditoria', '/api/auditoria']
 
 // Archivos estáticos servidos desde public/ (logo, imágenes, fuentes, etc.).

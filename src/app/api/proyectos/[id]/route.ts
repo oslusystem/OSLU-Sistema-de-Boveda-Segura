@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { unlink } from 'fs/promises'
-import { join } from 'path'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_CLASIFICACION } from '@/lib/auth'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
+import { deleteEncrypted } from '@/lib/storage'
 
 const patchSchema = z.object({
   nombre_proyecto:               z.string().min(2).max(150).optional(),
@@ -92,7 +91,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 }
 
 // ─── DELETE: eliminar proyecto (sólo Administrador) ────────────────────────────
-// Purga todos sus archivos del disco, los borra de BD y luego elimina el proyecto.
+// Purga todos sus archivos (blobs), los borra de BD y luego elimina el proyecto.
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
@@ -107,11 +106,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   })
   if (!proyecto) return NextResponse.json({ ok: false, error: 'No encontrado' }, { status: 404 })
 
-  // Purgar archivos cifrados del disco (best-effort; pueden no existir ya).
+  // Purgar blobs cifrados (best-effort; pueden no existir ya).
   await Promise.all(
-    proyecto.archivos.map((a) =>
-      unlink(join(process.cwd(), a.ruta_cifrada)).catch(() => {}),
-    ),
+    proyecto.archivos.map((a) => deleteEncrypted(a.ruta_cifrada).catch(() => {})),
   )
 
   // Borrar archivos y proyecto en una transacción. GestionClave cascada desde Archivo.

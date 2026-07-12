@@ -5,6 +5,51 @@ Todos los commits del proyecto siguen [Conventional Commits](https://www.convent
 e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
+## [Avance #5] — Despliegue y auto-recuperación
+
+### Added
+- Endpoint `GET /api/health` (`src/app/api/health/route.ts`): verifica
+  conexión a la base de datos; ruta pública en `middleware.ts`, usada como
+  healthcheck y como primer paso de diagnóstico ante incidentes (Tarea #22).
+- Colaborador `osmaneduardo2232-prog` agregado a `CONTRIBUTORS.md` con su
+  propio commit, y protección de `main` actualizada para exigir 1 aprobación
+  real (peer review) además de CI en verde (Tarea #21).
+- `src/lib/storage.ts`: capa de almacenamiento para los archivos cifrados
+  (`storeEncrypted`/`readEncrypted`/`deleteEncrypted`), usada por las 4 rutas
+  que antes leían/escribían `storage/vault/` en disco — implementada primero
+  sobre Vercel Blob (Tarea #24), migrada luego a Netlify Blobs (Tarea #25)
+  sin cambiar la interfaz pública ni las rutas que la consumen.
+- `prisma/schema.prisma`: `directUrl` además de `url` en el datasource — Neon
+  requiere una conexión directa (sin PgBouncer) para migrar (Tarea #24).
+- Job `deploy` en `.github/workflows/ci.yml`: se dispara sólo al fusionar un
+  Pull Request a `main` (CI en verde), aplica `prisma migrate deploy` contra
+  Neon y publica el build — sin intervención manual, evolución del pipeline
+  del Avance #3 (Tarea #24, actualizado a Netlify en la Tarea #25).
+
+### Changed
+- **Pivote de infraestructura #1: Railway (Docker) → Vercel + Neon + Vercel
+  Blob.** Railway exige tarjeta/plan pago (Hobby, ~$5/mes) para tokens de
+  proyecto, dominios y volúmenes persistentes más allá del trial; se optó por
+  una combinación 100% gratuita y sin tarjeta. Esto retira el `Dockerfile`,
+  `docker-entrypoint.sh`, `docker-compose.yml` y `railway.json` agregados
+  originalmente en la Tarea #22 (superados), y `output: 'standalone'` de
+  `next.config.ts` (innecesario/desaconsejado en Vercel) (Tarea #24).
+- **Pivote de infraestructura #2: Vercel → Netlify.** La cuenta de Vercel
+  pidió una verificación adicional que bloqueaba continuar en el plazo
+  disponible; se migró a Netlify (mismo modelo serverless, mismo Neon para la
+  BD). `src/lib/storage.ts` pasa de `@vercel/blob` a `@netlify/blobs`
+  (interfaz idéntica), se agrega `netlify.toml`, y el job `deploy` usa
+  Netlify CLI (`netlify deploy --prod`) en vez de Vercel CLI (Tarea #25).
+
+### Fixed
+- `next` actualizado de `15.1.0` a `15.5.20`: la versión anterior tenía un CVE
+  crítico (`CVE-2025-66478`) y varios de severidad alta/media (Tarea #23).
+- `prisma/schema.prisma`: `binaryTargets = ["native", "rhel-openssl-3.0.x"]`.
+  El primer deploy en Netlify fallaba (`/api/health` y login devolvían error)
+  porque el motor de Prisma se había generado sólo para Windows; sin el
+  target del runtime de las funciones serverless de Netlify (Amazon Linux),
+  el cliente no encuentra el Query Engine en producción (Tarea #26).
+
 ## [Avance #4] — Prototipo inicial viable
 
 ### Added
@@ -63,3 +108,9 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 18 | Badge de estado de CI en el README | Docs |
 | 19 | Quitar diagrama ER y de secuencia MFA del README | Docs |
 | 20 | `CONTRIBUTORS.md` base | Docs |
+| 21 | Agregar a osmaneduardo2232-prog como colaborador + exigir 1 aprobación en `main` | DevOps |
+| 22 | `/api/health` + intento inicial de despliegue en Railway (superado por Tarea #24) | DevOps |
+| 23 | Actualizar Next.js a 15.5.20 (CVEs críticos en 15.1.0) | Seguridad |
+| 24 | Pivote a Vercel + Neon + Vercel Blob: storage.ts, directUrl, CD sin Docker (superado por Tarea #25) | DevOps |
+| 25 | Pivote a Netlify + Neon + Netlify Blobs (Vercel pidió verificación adicional) | DevOps |
+| 26 | Fix: `binaryTargets` de Prisma para el runtime serverless de Netlify | DevOps |
