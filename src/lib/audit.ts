@@ -15,6 +15,7 @@
  */
 import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
+import { logEvent } from '@/lib/logger'
 
 export type EventoAuditoria =
   | 'LOGIN'
@@ -116,7 +117,10 @@ export async function registrarEvento(opts: RegistrarOpts): Promise<void> {
     )
   } catch (err) {
     // La auditoría no debe tumbar la operación principal, pero sí debe gritar.
-    console.error(`[ERROR] [${timestamp}] No se pudo registrar evento de auditoría:`, err)
+    logEvent('error', 'AUDIT', 'No se pudo registrar evento de auditoría', {
+      evento: opts.evento,
+      detail: err instanceof Error ? err.message : 'Error desconocido',
+    })
   }
 }
 

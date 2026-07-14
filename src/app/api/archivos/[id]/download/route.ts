@@ -5,8 +5,10 @@ import { decryptBuffer, unwrapKey, hashContent } from '@/lib/crypto'
 import { readEncrypted } from '@/lib/storage'
 import { puedeAccederArchivo } from '@/lib/access'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
+import { getRequestId, errorResponse, logEvent } from '@/lib/logger'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
 
@@ -25,28 +27,28 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     )
   }
 
-  // ── Control de acceso: clasificación + need-to-know ──────────────────────────
-  const acceso = await puedeAccederArchivo(session.sub, id)
-  if (!acceso.permitido) {
-    await registrarEvento({
-      usuarioId: session.sub,
-      evento: 'ACCESS_DENIED',
-      detalle: `Acceso denegado a archivo ${id} (motivo: ${acceso.motivo})`,
-      ...origen,
-    })
-    const status = acceso.motivo === 'NO_ENCONTRADO' ? 404 : 403
-    return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status })
-  }
-
-  const archivo = await prisma.archivo.findUnique({
-    where: { id },
-    include: { clave: true },
-  })
-  if (!archivo || !archivo.clave) {
-    return NextResponse.json({ ok: false, error: 'Archivo no disponible' }, { status: 404 })
-  }
-
   try {
+    // ── Control de acceso: clasificación + need-to-know ──────────────────────────
+    const acceso = await puedeAccederArchivo(session.sub, id)
+    if (!acceso.permitido) {
+      await registrarEvento({
+        usuarioId: session.sub,
+        evento: 'ACCESS_DENIED',
+        detalle: `Acceso denegado a archivo ${id} (motivo: ${acceso.motivo})`,
+        ...origen,
+      })
+      const status = acceso.motivo === 'NO_ENCONTRADO' ? 404 : 403
+      return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status })
+    }
+
+    const archivo = await prisma.archivo.findUnique({
+      where: { id },
+      include: { clave: true },
+    })
+    if (!archivo || !archivo.clave) {
+      return NextResponse.json({ ok: false, error: 'Archivo no disponible' }, { status: 404 })
+    }
+
     // ── Descifrar: leer .enc → desenvolver clave → AES-GCM → verificar hash ────
     const blob    = await readEncrypted(archivo.ruta_cifrada)
     const fileKey = unwrapKey(archivo.clave.clave_cifrada)
@@ -60,7 +62,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         detalle: `Integridad comprometida en archivo ${id}: hash no coincide`,
         ...origen,
       })
-      console.error(`[ERROR] [${new Date().toISOString()}] Integridad fallida en archivo ${id}`)
+      logEvent('error', 'DOWNLOAD_INTEGRITY', `Integridad fallida en archivo ${id}`, { requestId })
       return NextResponse.json({ ok: false, error: 'Integridad del archivo comprometida' }, { status: 409 })
     }
 
@@ -79,7 +81,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     })
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [DOWNLOAD] archivo ${id}`, err)
-    return NextResponse.json({ ok: false, error: 'No se pudo descifrar el archivo' }, { status: 500 })
+    return errorResponse('DOWNLOAD', err, requestId)
   }
 }

@@ -4,6 +4,7 @@ import { getSessionFromCookies, signFileAccessToken } from '@/lib/auth'
 import { decryptString } from '@/lib/crypto'
 import { parseDescriptor, matchFace } from '@/lib/face'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
+import { getRequestId, errorResponse } from '@/lib/logger'
 
 /**
  * Re-verificación facial puntual: requerida justo antes de ver/descargar un
@@ -12,6 +13,7 @@ import { registrarEvento, extraerOrigen } from '@/lib/audit'
  * archivo, que el cliente debe adjuntar a la siguiente llamada de descarga.
  */
 export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req)
   const origen = extraerOrigen(req)
 
   const session = await getSessionFromCookies()
@@ -66,7 +68,6 @@ export async function POST(req: NextRequest) {
     const token = signFileAccessToken(usuario.id, archivoId)
     return NextResponse.json({ ok: true, data: { token } })
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [VERIFY_FACE]`, err)
-    return NextResponse.json({ ok: false, error: 'No se pudo verificar el rostro' }, { status: 400 })
+    return errorResponse('VERIFY_FACE', err, requestId)
   }
 }
