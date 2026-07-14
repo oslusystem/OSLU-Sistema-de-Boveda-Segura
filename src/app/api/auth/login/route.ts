@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { verifyPassword, signPreAuthToken, PREAUTH_COOKIE } from '@/lib/auth'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
+import { getRequestId, errorResponse } from '@/lib/logger'
 
 const bodySchema = z.object({
   nombre_usuario: z.string().min(3, 'Usuario demasiado corto').max(120),
@@ -19,6 +20,7 @@ const MAX_INTENTOS_FALLIDOS = 3
  * registrar el rostro (primer ingreso) o verificarlo.
  */
 export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req)
   const origen = extraerOrigen(req)
 
   try {
@@ -108,7 +110,6 @@ export async function POST(req: NextRequest) {
     })
     return res
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [LOGIN]`, err)
-    return NextResponse.json({ ok: false, error: 'Error interno del servidor' }, { status: 500 })
+    return errorResponse('LOGIN', err, requestId)
   }
 }

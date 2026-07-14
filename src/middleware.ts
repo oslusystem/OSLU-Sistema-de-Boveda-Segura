@@ -79,6 +79,19 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const secret = process.env.JWT_SECRET ?? 'dev-secret-change-me'
 
+  // Correlation ID: identifica esta petición de punta a punta (logs +
+  // mensaje de error visible al usuario). Se inyecta como header hacia los
+  // route handlers y también en la respuesta, para poder rastrear un
+  // incidente reportado por un usuario hasta la línea de log exacta.
+  const requestId = crypto.randomUUID()
+  const forwardHeaders = new Headers(request.headers)
+  forwardHeaders.set('x-request-id', requestId)
+
+  function withRequestId<T extends NextResponse>(response: T): T {
+    response.headers.set('x-request-id', requestId)
+    return response
+  }
+
   // Assets y rutas públicas — pasar sin verificar
   if (
     pathname.startsWith('/_next') ||
@@ -88,7 +101,7 @@ export async function middleware(request: NextRequest) {
     PUBLIC_FILE.test(pathname) ||       // assets estáticos de public/ (logo, imágenes…)
     PUBLIC_ROUTES.some(r => pathname.startsWith(r))
   ) {
-    return NextResponse.next()
+    return withRequestId(NextResponse.next({ request: { headers: forwardHeaders } }))
   }
 
   const token   = request.cookies.get(TOKEN_COOKIE)?.value
@@ -97,19 +110,19 @@ export async function middleware(request: NextRequest) {
   // Sin sesión válida
   if (!payload) {
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
+      return withRequestId(NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 }))
     }
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
+    return withRequestId(NextResponse.redirect(loginUrl))
   }
 
   // Rutas sólo para ADMIN (por nivel de rol, no por nombre)
   if (ADMIN_ROUTES.some(r => pathname.startsWith(r)) && payload.rol_nivel < NIVEL_ADMIN) {
     if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status: 403 })
+      return withRequestId(NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status: 403 }))
     }
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    return withRequestId(NextResponse.redirect(new URL('/dashboard', request.url)))
   }
 
   // Eliminar archivos o proyectos: sólo Administrador
@@ -118,18 +131,17 @@ export async function middleware(request: NextRequest) {
     request.method === 'DELETE' &&
     payload.rol_nivel < NIVEL_ADMIN
   ) {
-    return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status: 403 })
+    return withRequestId(NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status: 403 }))
   }
 
   // Inyectar identidad en headers para los route handlers (evita re-verificar el JWT)
-  const headers = new Headers(request.headers)
-  headers.set('x-user-id',        payload.sub)
-  headers.set('x-user-name',      payload.usuario)
-  headers.set('x-user-role',      payload.rol)
-  headers.set('x-user-role-nivel', String(payload.rol_nivel))
-  headers.set('x-user-nivel',     String(payload.nivel))
+  forwardHeaders.set('x-user-id',        payload.sub)
+  forwardHeaders.set('x-user-name',      payload.usuario)
+  forwardHeaders.set('x-user-role',      payload.rol)
+  forwardHeaders.set('x-user-role-nivel', String(payload.rol_nivel))
+  forwardHeaders.set('x-user-nivel',     String(payload.nivel))
 
-  return NextResponse.next({ request: { headers } })
+  return withRequestId(NextResponse.next({ request: { headers: forwardHeaders } }))
 }
 
 export const config = {

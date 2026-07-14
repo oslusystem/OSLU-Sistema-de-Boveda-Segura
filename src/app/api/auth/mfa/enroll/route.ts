@@ -6,6 +6,8 @@ import { encryptString } from '@/lib/crypto'
 import { parseDescriptor } from '@/lib/face'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { issueSession } from '@/lib/session'
+import { getRequestId, errorResponse } from '@/lib/logger'
+import { faceDescriptorSchema } from '@/lib/validation'
 
 /**
  * Paso 2a del login (primer ingreso): registra el rostro del usuario.
@@ -14,6 +16,7 @@ import { issueSession } from '@/lib/session'
  * como el usuario acaba de probar identidad y presencia, emite la sesión.
  */
 export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req)
   const origen = extraerOrigen(req)
 
   const preauth = req.cookies.get(PREAUTH_COOKIE)?.value
@@ -22,8 +25,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Sesión de autenticación expirada. Reinicie el login.' }, { status: 401 })
   }
 
+  const { descriptor } = await req.json()
+  const parsedDescriptor = faceDescriptorSchema.safeParse(descriptor)
+  if (!parsedDescriptor.success) {
+    return NextResponse.json({ ok: false, error: 'Descriptor facial inválido' }, { status: 400 })
+  }
+
   try {
-    const { descriptor } = await req.json()
     const desc = parseDescriptor(descriptor)
 
     const usuario = await prisma.usuario.findUnique({
@@ -72,7 +80,6 @@ export async function POST(req: NextRequest) {
     })
     return issueSession(token)
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [MFA_ENROLL]`, err)
-    return NextResponse.json({ ok: false, error: 'No se pudo registrar el rostro' }, { status: 400 })
+    return errorResponse('MFA_ENROLL', err, requestId)
   }
 }

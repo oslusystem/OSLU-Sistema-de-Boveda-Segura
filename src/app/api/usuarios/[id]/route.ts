@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, hashPassword, verifyPassword, getAdminPrincipalId, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_CLASIFICACION } from '@/lib/auth'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
-import { passwordSchema } from '@/lib/validation'
+import { passwordSchema, cuidSchema } from '@/lib/validation'
+import { getRequestId, errorResponse } from '@/lib/logger'
 
 const patchSchema = z.object({
   nombre_usuario:         z.string().min(3).max(120).optional(),
@@ -22,6 +23,7 @@ const deleteAdminSchema = z.object({
 
 // ─── PATCH: editar usuario (sólo Admin) ───────────────────────────────────────
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   if (session.rol_nivel < NIVEL_ROL.ADMIN) {
@@ -29,6 +31,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   if (id === await getAdminPrincipalId()) {
     return NextResponse.json({ ok: false, error: 'No se puede modificar al administrador principal del sistema' }, { status: 400 })
   }
@@ -36,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = patchSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Datos inválidos' }, { status: 400 })
 
+  try {
   // Ciertos roles tienen un tope de acreditación fijo (ver TOPE_CLASIFICACION_ROL).
   // Resolvemos el rol/nivel EFECTIVOS (los del body si vienen, o los actuales del usuario).
   if (parsed.data.rol_id || parsed.data.nivel_clasificacion_id) {
@@ -82,10 +88,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   })
 
   return NextResponse.json({ ok: true, data: { ...usuario, fecha_creacion: usuario.fecha_creacion.toISOString() } })
+  } catch (err) {
+    return errorResponse('USUARIO_EDIT', err, requestId)
+  }
 }
 
 // ─── DELETE: eliminar usuario (sólo Admin) ────────────────────────────────────
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   if (session.rol_nivel < NIVEL_ROL.ADMIN) {
@@ -93,6 +103,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   if (id === session.sub) {
     return NextResponse.json({ ok: false, error: 'No puede eliminarse a sí mismo' }, { status: 400 })
   }
@@ -100,6 +113,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ ok: false, error: 'No se puede eliminar al administrador principal del sistema' }, { status: 400 })
   }
 
+  try {
   // Buscar primero para dar un mensaje claro si no existe
   const target = await prisma.usuario.findUnique({
     where: { id },
@@ -147,4 +161,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   })
 
   return NextResponse.json({ ok: true })
+  } catch (err) {
+    return errorResponse('USUARIO_DELETE', err, requestId)
+  }
 }

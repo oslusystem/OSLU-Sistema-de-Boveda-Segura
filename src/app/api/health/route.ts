@@ -3,10 +3,12 @@
  * (Railway healthcheck, restart policy, y diagnóstico manual en incidentes).
  * Ruta pública (ver PUBLIC_ROUTES en middleware.ts): no exige sesión.
  */
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getRequestId, logEvent } from '@/lib/logger'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const requestId = getRequestId(req)
   try {
     await prisma.$queryRaw`SELECT 1`
     return NextResponse.json({
@@ -16,7 +18,7 @@ export async function GET() {
       uptime_s: Math.floor(process.uptime()),
     })
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [HEALTH]`, err)
+    logEvent('error', 'HEALTH', err instanceof Error ? err.message : 'Error desconocido', { requestId })
     return NextResponse.json(
       { status: 'error', db: 'disconnected', timestamp: new Date().toISOString() },
       { status: 503 },

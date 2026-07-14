@@ -1,22 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, NIVEL_ROL } from '@/lib/auth'
+import { getRequestId, errorResponse } from '@/lib/logger'
+
+// Formatos permitidos explícitos (allow-list) para los parámetros de orden —
+// cualquier otro valor cae al valor por defecto en vez de propagarse a Prisma.
+const sortBySchema  = z.enum(['timestamp', 'evento']).catch('timestamp')
+const sortDirSchema = z.enum(['asc', 'desc']).catch('desc')
 
 // ─── GET: listar la bitácora de auditoría (sólo Admin) ───────────────────────
 export async function GET(req: NextRequest) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   if (session.rol_nivel < NIVEL_ROL.ADMIN) {
     return NextResponse.json({ ok: false, error: 'Sin permisos' }, { status: 403 })
   }
 
+  try {
   const sp      = req.nextUrl.searchParams
   const page    = Math.max(1, Number(sp.get('page') ?? 1))
   const limit   = Math.min(100, Math.max(1, Number(sp.get('limit') ?? 25)))
   const evento  = sp.get('evento') ?? ''
   const search  = sp.get('search') ?? ''
-  const sortBy  = sp.get('sortBy') ?? 'timestamp'
-  const sortDir = sp.get('sortDir') === 'asc' ? ('asc' as const) : ('desc' as const)
+  const sortBy  = sortBySchema.parse(sp.get('sortBy'))
+  const sortDir = sortDirSchema.parse(sp.get('sortDir'))
 
   // Para búsqueda por nombre de usuario buscamos los IDs primero (ya no hay FK/relación)
   let userIdsFromSearch: string[] = []
@@ -86,4 +95,7 @@ export async function GET(req: NextRequest) {
       total, page, limit, pages: Math.ceil(total / limit),
     },
   })
+  } catch (err) {
+    return errorResponse('AUDITORIA_LIST', err, requestId)
+  }
 }

@@ -4,6 +4,8 @@ import { getSessionFromCookies, signFileAccessToken } from '@/lib/auth'
 import { decryptString } from '@/lib/crypto'
 import { parseDescriptor, matchFace } from '@/lib/face'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
+import { getRequestId, errorResponse } from '@/lib/logger'
+import { faceDescriptorSchema, cuidSchema } from '@/lib/validation'
 
 /**
  * Re-verificación facial puntual: requerida justo antes de ver/descargar un
@@ -12,6 +14,7 @@ import { registrarEvento, extraerOrigen } from '@/lib/audit'
  * archivo, que el cliente debe adjuntar a la siguiente llamada de descarga.
  */
 export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req)
   const origen = extraerOrigen(req)
 
   const session = await getSessionFromCookies()
@@ -19,11 +22,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   }
 
+  const { descriptor, archivoId } = await req.json()
+  if (!cuidSchema.safeParse(archivoId).success) {
+    return NextResponse.json({ ok: false, error: 'Archivo no especificado' }, { status: 400 })
+  }
+  const parsedDescriptor = faceDescriptorSchema.safeParse(descriptor)
+  if (!parsedDescriptor.success) {
+    return NextResponse.json({ ok: false, error: 'Descriptor facial inválido' }, { status: 400 })
+  }
+
   try {
-    const { descriptor, archivoId } = await req.json()
-    if (typeof archivoId !== 'string' || !archivoId) {
-      return NextResponse.json({ ok: false, error: 'Archivo no especificado' }, { status: 400 })
-    }
     const candidato = parseDescriptor(descriptor)
 
     const usuario = await prisma.usuario.findUnique({
@@ -66,7 +74,6 @@ export async function POST(req: NextRequest) {
     const token = signFileAccessToken(usuario.id, archivoId)
     return NextResponse.json({ ok: true, data: { token } })
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [VERIFY_FACE]`, err)
-    return NextResponse.json({ ok: false, error: 'No se pudo verificar el rostro' }, { status: 400 })
+    return errorResponse('VERIFY_FACE', err, requestId)
   }
 }
