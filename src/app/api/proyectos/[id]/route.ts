@@ -5,6 +5,7 @@ import { getSessionFromCookies, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { deleteEncrypted } from '@/lib/storage'
 import { getRequestId, errorResponse } from '@/lib/logger'
+import { cuidSchema } from '@/lib/validation'
 
 const patchSchema = z.object({
   nombre_proyecto:               z.string().min(2).max(150).optional(),
@@ -23,6 +24,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const topeRol = TOPE_CLASIFICACION_ROL[session.rol_nivel]
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   const parsed = patchSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Datos inválidos' }, { status: 400 })
 
@@ -108,6 +112,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   try {
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   const proyecto = await prisma.proyecto.findUnique({
     where: { id },
     include: { archivos: { select: { id: true, nombre_archivo: true, ruta_cifrada: true } } },

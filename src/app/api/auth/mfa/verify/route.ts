@@ -6,6 +6,7 @@ import { parseDescriptor, matchFace } from '@/lib/face'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { issueSession } from '@/lib/session'
 import { getRequestId, errorResponse } from '@/lib/logger'
+import { faceDescriptorSchema } from '@/lib/validation'
 
 /**
  * Paso 2b del login: verifica el rostro contra el descriptor registrado.
@@ -23,8 +24,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Sesión de autenticación expirada. Reinicie el login.' }, { status: 401 })
   }
 
+  const { descriptor } = await req.json()
+  const parsedDescriptor = faceDescriptorSchema.safeParse(descriptor)
+  if (!parsedDescriptor.success) {
+    return NextResponse.json({ ok: false, error: 'Descriptor facial inválido' }, { status: 400 })
+  }
+
   try {
-    const { descriptor } = await req.json()
     const candidato = parseDescriptor(descriptor)
 
     const usuario = await prisma.usuario.findUnique({

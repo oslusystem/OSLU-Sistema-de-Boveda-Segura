@@ -23,6 +23,22 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
   PATCH, `roles`, `usuarios`, `usuarios/[id]`) (Tarea #27).
 - `tests/logger.test.ts`: valida el formato JSON de los logs y que
   `errorResponse` nunca expone el mensaje real del error (Tarea #27).
+- `src/lib/validation.ts`: nuevos esquemas reutilizables — `cuidSchema`,
+  `paginationSchema`, `nombreArchivoSchema`, `descripcionSchema`,
+  `faceDescriptorSchema` (Tarea #28).
+- Validación explícita antes de tocar Prisma en `archivos` POST/PATCH
+  (`proyecto_id`/`nivel_clasificacion_id` como cuid, límites de longitud en
+  nombre/descripción) y en `auth/mfa/enroll`, `auth/mfa/verify`,
+  `auth/verify-face` (descriptor facial validado con Zod antes del try/catch,
+  para que un formato inválido devuelva 400 en vez de caer en el 500
+  genérico) (Tarea #28).
+- Todos los `[id]` de ruta (`archivos/[id]`, `archivos/[id]/download`,
+  `proyectos/[id]`, `usuarios/[id]`) validan el formato cuid antes de
+  golpear Prisma, devolviendo 400 ante un id malformado en vez de dejar que
+  Prisma lo resuelva como "no encontrado" (Tarea #28).
+- `auditoria` GET: `sortBy`/`sortDir` ahora usan un `z.enum` explícito
+  (allow-list) en vez de fallbacks manuales (Tarea #28).
+- `tests/validation.test.ts`: 4 pruebas nuevas para los esquemas agregados.
 
 ## [Avance #5] — Despliegue y auto-recuperación
 
@@ -134,3 +150,4 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 25 | Pivote a Netlify + Neon + Netlify Blobs (Vercel pidió verificación adicional) | DevOps |
 | 26 | Fix: `binaryTargets` de Prisma para el runtime serverless de Netlify | DevOps |
 | 27 | Correlation ID + logs estructurados en JSON (`logger.ts`, middleware, 17 rutas) | Seguridad |
+| 28 | Validación BlueTeam: esquemas Zod reutilizables, cuid en `[id]`, descriptor facial, sort allow-list | Seguridad |
