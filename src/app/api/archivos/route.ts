@@ -9,6 +9,7 @@ import { storeEncrypted } from '@/lib/storage'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { proyectosVisibles } from '@/lib/access'
 import { getRequestId, errorResponse } from '@/lib/logger'
+import { cuidSchema, nombreArchivoSchema, descripcionSchema } from '@/lib/validation'
 
 // ─── GET: listar archivos visibles para el usuario ────────────────────────────
 export async function GET(req: NextRequest) {
@@ -90,9 +91,19 @@ export async function POST(req: NextRequest) {
     const nivelId     = form.get('nivelClasificacionId') as string | null
     const descripcion = (form.get('descripcion') as string | null) ?? null
 
-    if (!file)       return NextResponse.json({ ok: false, error: 'No se recibió archivo' }, { status: 400 })
-    if (!proyectoId) return NextResponse.json({ ok: false, error: 'Proyecto requerido' }, { status: 400 })
-    if (!nivelId)    return NextResponse.json({ ok: false, error: 'Nivel de clasificación requerido' }, { status: 400 })
+    if (!file) return NextResponse.json({ ok: false, error: 'No se recibió archivo' }, { status: 400 })
+    if (!proyectoId || !cuidSchema.safeParse(proyectoId).success) {
+      return NextResponse.json({ ok: false, error: 'Proyecto requerido' }, { status: 400 })
+    }
+    if (!nivelId || !cuidSchema.safeParse(nivelId).success) {
+      return NextResponse.json({ ok: false, error: 'Nivel de clasificación requerido' }, { status: 400 })
+    }
+    if (!nombreArchivoSchema.safeParse(file.name).success) {
+      return NextResponse.json({ ok: false, error: 'Nombre de archivo inválido' }, { status: 400 })
+    }
+    if (descripcion !== null && !descripcionSchema.safeParse(descripcion).success) {
+      return NextResponse.json({ ok: false, error: 'Descripción demasiado larga' }, { status: 400 })
+    }
 
     const ext = extname(file.name).slice(1).toLowerCase()
     if (!ALLOWED_EXTENSIONS.includes(ext)) {

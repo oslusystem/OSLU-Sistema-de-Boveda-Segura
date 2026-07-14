@@ -6,6 +6,7 @@ import { readEncrypted } from '@/lib/storage'
 import { puedeAccederArchivo } from '@/lib/access'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { getRequestId, errorResponse, logEvent } from '@/lib/logger'
+import { cuidSchema } from '@/lib/validation'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const requestId = getRequestId(req)
@@ -13,6 +14,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   const origen = extraerOrigen(req)
   const isView = req.nextUrl.searchParams.get('view') === '1'
 

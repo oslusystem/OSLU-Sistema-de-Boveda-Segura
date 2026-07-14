@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, hashPassword, verifyPassword, getAdminPrincipalId, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_CLASIFICACION } from '@/lib/auth'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
-import { passwordSchema } from '@/lib/validation'
+import { passwordSchema, cuidSchema } from '@/lib/validation'
 import { getRequestId, errorResponse } from '@/lib/logger'
 
 const patchSchema = z.object({
@@ -31,6 +31,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   if (id === await getAdminPrincipalId()) {
     return NextResponse.json({ ok: false, error: 'No se puede modificar al administrador principal del sistema' }, { status: 400 })
   }
@@ -100,6 +103,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   if (id === session.sub) {
     return NextResponse.json({ ok: false, error: 'No puede eliminarse a sí mismo' }, { status: 400 })
   }

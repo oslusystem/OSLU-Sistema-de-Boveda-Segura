@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_CLASIFICACION } from '@/lib/auth'
 import { puedeAccederArchivo } from '@/lib/access'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { deleteEncrypted } from '@/lib/storage'
 import { getRequestId, errorResponse } from '@/lib/logger'
+import { cuidSchema, nombreArchivoSchema, descripcionSchema } from '@/lib/validation'
+
+const patchSchema = z.object({
+  nombre_archivo:          nombreArchivoSchema.optional(),
+  descripcion:             descripcionSchema,
+  proyecto_id:             cuidSchema.optional(),
+  nivel_clasificacion_id:  cuidSchema.optional(),
+})
 
 // ─── GET: metadatos de un archivo (sin contenido) ─────────────────────────────
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +23,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   try {
     const { id } = await params
+    if (!cuidSchema.safeParse(id).success) {
+      return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+    }
     const acceso = await puedeAccederArchivo(session.sub, id)
     if (!acceso.permitido) {
       const status = acceso.motivo === 'NO_ENCONTRADO' ? 404 : 403
@@ -49,14 +61,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const topeRol = TOPE_CLASIFICACION_ROL[session.rol_nivel]
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   const acceso = await puedeAccederArchivo(session.sub, id)
   if (!acceso.permitido) {
     const status = acceso.motivo === 'NO_ENCONTRADO' ? 404 : 403
     return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status })
   }
 
+  const parsedBody = patchSchema.safeParse(await req.json())
+  if (!parsedBody.success) return NextResponse.json({ ok: false, error: 'Datos inválidos' }, { status: 400 })
+
   try {
-    const { nombre_archivo, descripcion, proyecto_id, nivel_clasificacion_id } = await req.json()
+    const { nombre_archivo, descripcion, proyecto_id, nivel_clasificacion_id } = parsedBody.data
 
     // Resolver el nivel efectivo del archivo y el mínimo del proyecto destino
     // para validar Bell-LaPadula antes de persistir cualquier cambio.
@@ -148,6 +166,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   }
 
   const { id } = await params
+  if (!cuidSchema.safeParse(id).success) {
+    return NextResponse.json({ ok: false, error: 'Identificador inválido' }, { status: 400 })
+  }
   const acceso = await puedeAccederArchivo(session.sub, id)
   if (!acceso.permitido) {
     const status = acceso.motivo === 'NO_ENCONTRADO' ? 404 : 403

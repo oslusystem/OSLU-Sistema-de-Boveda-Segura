@@ -5,6 +5,7 @@ import { decryptString } from '@/lib/crypto'
 import { parseDescriptor, matchFace } from '@/lib/face'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { getRequestId, errorResponse } from '@/lib/logger'
+import { faceDescriptorSchema, cuidSchema } from '@/lib/validation'
 
 /**
  * Re-verificación facial puntual: requerida justo antes de ver/descargar un
@@ -21,11 +22,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   }
 
+  const { descriptor, archivoId } = await req.json()
+  if (!cuidSchema.safeParse(archivoId).success) {
+    return NextResponse.json({ ok: false, error: 'Archivo no especificado' }, { status: 400 })
+  }
+  const parsedDescriptor = faceDescriptorSchema.safeParse(descriptor)
+  if (!parsedDescriptor.success) {
+    return NextResponse.json({ ok: false, error: 'Descriptor facial inválido' }, { status: 400 })
+  }
+
   try {
-    const { descriptor, archivoId } = await req.json()
-    if (typeof archivoId !== 'string' || !archivoId) {
-      return NextResponse.json({ ok: false, error: 'Archivo no especificado' }, { status: 400 })
-    }
     const candidato = parseDescriptor(descriptor)
 
     const usuario = await prisma.usuario.findUnique({
