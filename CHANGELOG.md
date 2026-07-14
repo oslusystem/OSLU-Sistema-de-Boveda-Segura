@@ -39,6 +39,17 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 - `auditoria` GET: `sortBy`/`sortDir` ahora usan un `z.enum` explícito
   (allow-list) en vez de fallbacks manuales (Tarea #28).
 - `tests/validation.test.ts`: 4 pruebas nuevas para los esquemas agregados.
+- `.github/workflows/backup.yml`: respaldo diario (+ disparo manual) de Neon
+  vía `pg_dump`, subido como artefacto de GitHub Actions (copia offsite, en
+  un medio distinto a Neon), con verificación real de restauración en el
+  mismo job (regla 3-2-1) (Tarea #29).
+
+### Fixed
+- `backup.yml` usaba `postgres:17`; Neon corre PostgreSQL 18 y `pg_dump`
+  aborta por desajuste de versión. Corregido a `postgres:18` en las tres
+  imágenes del workflow (builder, restore-check y smoke test) y verificado
+  con una corrida real: dump → artefacto → `pg_restore` → `SELECT count(*)
+  FROM usuarios` devolvió 5, igual que producción (Tarea #30).
 
 ## [Avance #5] — Despliegue y auto-recuperación
 
@@ -151,3 +162,5 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 26 | Fix: `binaryTargets` de Prisma para el runtime serverless de Netlify | DevOps |
 | 27 | Correlation ID + logs estructurados en JSON (`logger.ts`, middleware, 17 rutas) | Seguridad |
 | 28 | Validación BlueTeam: esquemas Zod reutilizables, cuid en `[id]`, descriptor facial, sort allow-list | Seguridad |
+| 29 | Workflow de respaldo automatizado (regla 3-2-1) con verificación real de restauración | DevOps |
+| 30 | Fix: `postgres:18` en `backup.yml` (Neon corre PG 18, no 17) | DevOps |
