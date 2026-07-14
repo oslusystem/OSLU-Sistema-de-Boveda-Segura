@@ -4,36 +4,43 @@ import { getSessionFromCookies, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_
 import { puedeAccederArchivo } from '@/lib/access'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { deleteEncrypted } from '@/lib/storage'
+import { getRequestId, errorResponse } from '@/lib/logger'
 
 // ─── GET: metadatos de un archivo (sin contenido) ─────────────────────────────
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
 
-  const { id } = await params
-  const acceso = await puedeAccederArchivo(session.sub, id)
-  if (!acceso.permitido) {
-    const status = acceso.motivo === 'NO_ENCONTRADO' ? 404 : 403
-    return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status })
+  try {
+    const { id } = await params
+    const acceso = await puedeAccederArchivo(session.sub, id)
+    if (!acceso.permitido) {
+      const status = acceso.motivo === 'NO_ENCONTRADO' ? 404 : 403
+      return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status })
+    }
+
+    const archivo = await prisma.archivo.findUnique({
+      where: { id },
+      select: {
+        id: true, nombre_archivo: true, hash_original: true, tamanio: true,
+        mime_type: true, descripcion: true, estado: true, fecha_subida: true,
+        usuario:             { select: { id: true, nombre_usuario: true } },
+        nivel_clasificacion: { select: { id: true, nombre: true, nivel_numerico: true } },
+        proyecto:            { select: { id: true, nombre_proyecto: true } },
+      },
+    })
+    if (!archivo) return NextResponse.json({ ok: false, error: 'No encontrado' }, { status: 404 })
+
+    return NextResponse.json({ ok: true, data: { ...archivo, fecha_subida: archivo.fecha_subida.toISOString() } })
+  } catch (err) {
+    return errorResponse('ARCHIVO_GET', err, requestId)
   }
-
-  const archivo = await prisma.archivo.findUnique({
-    where: { id },
-    select: {
-      id: true, nombre_archivo: true, hash_original: true, tamanio: true,
-      mime_type: true, descripcion: true, estado: true, fecha_subida: true,
-      usuario:             { select: { id: true, nombre_usuario: true } },
-      nivel_clasificacion: { select: { id: true, nombre: true, nivel_numerico: true } },
-      proyecto:            { select: { id: true, nombre_proyecto: true } },
-    },
-  })
-  if (!archivo) return NextResponse.json({ ok: false, error: 'No encontrado' }, { status: 404 })
-
-  return NextResponse.json({ ok: true, data: { ...archivo, fecha_subida: archivo.fecha_subida.toISOString() } })
 }
 
 // ─── PATCH: actualizar metadatos (mínimo Oficial Subalterno, sujeto a tope de rol) ──
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   if (session.rol_nivel < NIVEL_ROL.OFICIAL_SUBALTERNO) {
@@ -48,11 +55,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status })
   }
 
-  const { nombre_archivo, descripcion, proyecto_id, nivel_clasificacion_id } = await req.json()
+  try {
+    const { nombre_archivo, descripcion, proyecto_id, nivel_clasificacion_id } = await req.json()
 
-  // Resolver el nivel efectivo del archivo y el mínimo del proyecto destino
-  // para validar Bell-LaPadula antes de persistir cualquier cambio.
-  const [archivoActual, proyectoDestino] = await Promise.all([
+    // Resolver el nivel efectivo del archivo y el mínimo del proyecto destino
+    // para validar Bell-LaPadula antes de persistir cualquier cambio.
+    const [archivoActual, proyectoDestino] = await Promise.all([
     proyecto_id || nivel_clasificacion_id
       ? prisma.archivo.findUnique({
           where: { id },
@@ -125,10 +133,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   })
 
   return NextResponse.json({ ok: true, data: { ...updated, fecha_actualizacion: updated.fecha_actualizacion.toISOString() } })
+  } catch (err) {
+    return errorResponse('ARCHIVO_EDIT', err, requestId)
+  }
 }
 
 // ─── DELETE: baja lógica + purga del archivo cifrado (sólo Administrador) ──────
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   if (session.rol_nivel < NIVEL_ROL.ADMIN) {
@@ -142,6 +154,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ ok: false, error: 'Acceso denegado' }, { status })
   }
 
+  try {
   const archivo = await prisma.archivo.findUnique({ where: { id } })
   if (!archivo) return NextResponse.json({ ok: false, error: 'No encontrado' }, { status: 404 })
 
@@ -161,4 +174,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   })
 
   return NextResponse.json({ ok: true })
+  } catch (err) {
+    return errorResponse('ARCHIVO_DELETE', err, requestId)
+  }
 }

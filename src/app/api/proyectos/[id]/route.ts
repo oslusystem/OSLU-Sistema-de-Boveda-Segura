@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { getSessionFromCookies, NIVEL_ROL, TOPE_CLASIFICACION_ROL, NOMBRE_NIVEL_CLASIFICACION } from '@/lib/auth'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { deleteEncrypted } from '@/lib/storage'
+import { getRequestId, errorResponse } from '@/lib/logger'
 
 const patchSchema = z.object({
   nombre_proyecto:               z.string().min(2).max(150).optional(),
@@ -13,6 +14,7 @@ const patchSchema = z.object({
 
 // ─── PATCH: editar proyecto (mínimo Oficial Subalterno, sujeto a tope de rol) ──
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   if (session.rol_nivel < NIVEL_ROL.OFICIAL_SUBALTERNO) {
@@ -24,6 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = patchSchema.safeParse(await req.json())
   if (!parsed.success) return NextResponse.json({ ok: false, error: 'Datos inválidos' }, { status: 400 })
 
+  try {
   if (topeRol !== undefined) {
     const actual = await prisma.proyecto.findUnique({
       where: { id },
@@ -88,17 +91,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   })
 
   return NextResponse.json({ ok: true, data: { ...proyecto, fecha_creacion: proyecto.fecha_creacion.toISOString() } })
+  } catch (err) {
+    return errorResponse('PROYECTO_EDIT', err, requestId)
+  }
 }
 
 // ─── DELETE: eliminar proyecto (sólo Administrador) ────────────────────────────
 // Purga todos sus archivos (blobs), los borra de BD y luego elimina el proyecto.
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
   if (session.rol_nivel < NIVEL_ROL.ADMIN) {
     return NextResponse.json({ ok: false, error: 'Sin permisos' }, { status: 403 })
   }
 
+  try {
   const { id } = await params
   const proyecto = await prisma.proyecto.findUnique({
     where: { id },
@@ -118,8 +126,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       prisma.archivo.deleteMany({ where: { proyecto_id: id } }),
       prisma.proyecto.delete({ where: { id } }),
     ])
-  } catch {
-    return NextResponse.json({ ok: false, error: 'No se pudo eliminar el proyecto.' }, { status: 500 })
+  } catch (err) {
+    return errorResponse('PROYECTO_DELETE', err, requestId)
   }
 
   await registrarEvento({
@@ -130,4 +138,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   })
 
   return NextResponse.json({ ok: true, data: { archivosEliminados: proyecto.archivos.length } })
+  } catch (err) {
+    return errorResponse('PROYECTO_DELETE', err, requestId)
+  }
 }

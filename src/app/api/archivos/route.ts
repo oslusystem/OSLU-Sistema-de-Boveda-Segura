@@ -8,62 +8,69 @@ import { generateFileKey, encryptBuffer, hashContent, wrapKey } from '@/lib/cryp
 import { storeEncrypted } from '@/lib/storage'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { proyectosVisibles } from '@/lib/access'
+import { getRequestId, errorResponse } from '@/lib/logger'
 
 // ─── GET: listar archivos visibles para el usuario ────────────────────────────
 export async function GET(req: NextRequest) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
 
-  const sp        = req.nextUrl.searchParams
-  const page      = Math.max(1, Number(sp.get('page') ?? 1))
-  const limit     = Math.min(100, Math.max(1, Number(sp.get('limit') ?? 50)))
-  const proyectoId = sp.get('proyectoId')
-  const search    = sp.get('q') ?? ''
+  try {
+    const sp        = req.nextUrl.searchParams
+    const page      = Math.max(1, Number(sp.get('page') ?? 1))
+    const limit     = Math.min(100, Math.max(1, Number(sp.get('limit') ?? 50)))
+    const proyectoId = sp.get('proyectoId')
+    const search    = sp.get('q') ?? ''
 
-  // Need-to-Know: sólo proyectos a los que el usuario tiene acceso efectivo.
-  const visibles = await proyectosVisibles(session.sub)
-  if (visibles.length === 0) {
-    return NextResponse.json({ ok: true, data: { items: [], total: 0, page, limit, pages: 0 } })
-  }
+    // Need-to-Know: sólo proyectos a los que el usuario tiene acceso efectivo.
+    const visibles = await proyectosVisibles(session.sub)
+    if (visibles.length === 0) {
+      return NextResponse.json({ ok: true, data: { items: [], total: 0, page, limit, pages: 0 } })
+    }
 
-  const where = {
-    estado: 'ACTIVO' as const,
-    proyecto_id: proyectoId && visibles.includes(proyectoId) ? proyectoId : { in: visibles },
-    // No mostrar archivos por encima de la acreditación del usuario.
-    nivel_clasificacion: { nivel_numerico: { lte: session.nivel } },
-    ...(search && { nombre_archivo: { contains: search, mode: 'insensitive' as const } }),
-  }
+    const where = {
+      estado: 'ACTIVO' as const,
+      proyecto_id: proyectoId && visibles.includes(proyectoId) ? proyectoId : { in: visibles },
+      // No mostrar archivos por encima de la acreditación del usuario.
+      nivel_clasificacion: { nivel_numerico: { lte: session.nivel } },
+      ...(search && { nombre_archivo: { contains: search, mode: 'insensitive' as const } }),
+    }
 
-  const [items, total] = await Promise.all([
-    prisma.archivo.findMany({
-      where,
-      skip:    (page - 1) * limit,
-      take:    limit,
-      orderBy: { fecha_subida: 'desc' },
-      select: {
-        id: true, nombre_archivo: true, hash_original: true, tamanio: true,
-        mime_type: true, descripcion: true, estado: true, fecha_subida: true,
-        usuario_id: true, nivel_clasificacion_id: true, proyecto_id: true,
-        usuario:             { select: { id: true, nombre_usuario: true } },
-        nivel_clasificacion: { select: { id: true, nombre: true, nivel_numerico: true } },
-        proyecto:            { select: { id: true, nombre_proyecto: true } },
-        // ruta_cifrada NUNCA se selecciona hacia el cliente.
+    const [items, total] = await Promise.all([
+      prisma.archivo.findMany({
+        where,
+        skip:    (page - 1) * limit,
+        take:    limit,
+        orderBy: { fecha_subida: 'desc' },
+        select: {
+          id: true, nombre_archivo: true, hash_original: true, tamanio: true,
+          mime_type: true, descripcion: true, estado: true, fecha_subida: true,
+          usuario_id: true, nivel_clasificacion_id: true, proyecto_id: true,
+          usuario:             { select: { id: true, nombre_usuario: true } },
+          nivel_clasificacion: { select: { id: true, nombre: true, nivel_numerico: true } },
+          proyecto:            { select: { id: true, nombre_proyecto: true } },
+          // ruta_cifrada NUNCA se selecciona hacia el cliente.
+        },
+      }),
+      prisma.archivo.count({ where }),
+    ])
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        items: items.map((a) => ({ ...a, fecha_subida: a.fecha_subida.toISOString() })),
+        total, page, limit, pages: Math.ceil(total / limit),
       },
-    }),
-    prisma.archivo.count({ where }),
-  ])
-
-  return NextResponse.json({
-    ok: true,
-    data: {
-      items: items.map((a) => ({ ...a, fecha_subida: a.fecha_subida.toISOString() })),
-      total, page, limit, pages: Math.ceil(total / limit),
-    },
-  })
+    })
+  } catch (err) {
+    return errorResponse('ARCHIVOS_LIST', err, requestId)
+  }
 }
 
 // ─── POST: subir y cifrar un archivo ──────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req)
   const session = await getSessionFromCookies()
   if (!session) return NextResponse.json({ ok: false, error: 'No autorizado' }, { status: 401 })
 
@@ -161,7 +168,6 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     )
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [UPLOAD]`, err)
-    return NextResponse.json({ ok: false, error: 'Error al procesar el archivo' }, { status: 500 })
+    return errorResponse('UPLOAD', err, requestId)
   }
 }

@@ -5,6 +5,7 @@ import { decryptString } from '@/lib/crypto'
 import { parseDescriptor, matchFace } from '@/lib/face'
 import { registrarEvento, extraerOrigen } from '@/lib/audit'
 import { issueSession } from '@/lib/session'
+import { getRequestId, errorResponse } from '@/lib/logger'
 
 /**
  * Paso 2b del login: verifica el rostro contra el descriptor registrado.
@@ -13,6 +14,7 @@ import { issueSession } from '@/lib/session'
  * la sesión. Cada intento queda en `eventos_mfa`.
  */
 export async function POST(req: NextRequest) {
+  const requestId = getRequestId(req)
   const origen = extraerOrigen(req)
 
   const preauth = req.cookies.get(PREAUTH_COOKIE)?.value
@@ -74,7 +76,6 @@ export async function POST(req: NextRequest) {
     })
     return issueSession(token)
   } catch (err) {
-    console.error(`[ERROR] [${new Date().toISOString()}] [MFA_VERIFY]`, err)
-    return NextResponse.json({ ok: false, error: 'No se pudo verificar el rostro' }, { status: 400 })
+    return errorResponse('MFA_VERIFY', err, requestId)
   }
 }
