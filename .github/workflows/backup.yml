@@ -18,7 +18,7 @@ jobs:
     # nunca se usa como destino real, se descarta al terminar el job.
     services:
       restore-check:
-        image: postgres:17
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
         ports:
@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Respaldar la base de datos de producción (Neon)
-        run: docker run --rm postgres:17 pg_dump "$DIRECT_URL" -Fc > backup.dump
+        run: docker run --rm postgres:18 pg_dump "$DIRECT_URL" -Fc > backup.dump
 
       - name: Subir el respaldo como artefacto (copia offsite)
         uses: actions/upload-artifact@v4
@@ -46,10 +46,10 @@ jobs:
       - name: Verificar que el respaldo restaura de verdad (smoke test)
         run: |
           docker run --rm --network host -e PGPASSWORD=postgres \
-            -v "$PWD/backup.dump:/backup.dump" postgres:17 \
+            -v "$PWD/backup.dump:/backup.dump" postgres:18 \
             pg_restore --clean --if-exists --no-owner --no-privileges \
               -h localhost -U postgres -d postgres /backup.dump
 
-          docker run --rm --network host -e PGPASSWORD=postgres postgres:17 \
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:18 \
             psql -h localhost -U postgres -d postgres -c \
               "SELECT count(*) AS usuarios FROM usuarios;"
