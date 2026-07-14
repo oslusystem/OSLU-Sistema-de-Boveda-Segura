@@ -1,0 +1,55 @@
+name: Backup de base de datos (regla 3-2-1)
+
+# Copia offsite (Tarea #29): la BD de producción vive en Neon; este workflow
+# genera una copia en un medio distinto (artefacto de GitHub Actions) de forma
+# automática y periódica, y además verifica que esa copia realmente restaura
+# (no basta con que el dump exista, tiene que poder revivir el sistema).
+on:
+  schedule:
+    - cron: '0 8 * * *' # diario, 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    name: Respaldar y verificar restauración
+    runs-on: ubuntu-latest
+
+    # BD efímera SOLO para probar que el dump restaura correctamente —
+    # nunca se usa como destino real, se descarta al terminar el job.
+    services:
+      restore-check:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+    steps:
+      - name: Respaldar la base de datos de producción (Neon)
+        run: docker run --rm postgres:17 pg_dump "$DIRECT_URL" -Fc > backup.dump
+
+      - name: Subir el respaldo como artefacto (copia offsite)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backup.dump
+          retention-days: 90
+
+      - name: Verificar que el respaldo restaura de verdad (smoke test)
+        run: |
+          docker run --rm --network host -e PGPASSWORD=postgres \
+            -v "$PWD/backup.dump:/backup.dump" postgres:17 \
+            pg_restore --clean --if-exists --no-owner --no-privileges \
+              -h localhost -U postgres -d postgres /backup.dump
+
+          docker run --rm --network host -e PGPASSWORD=postgres postgres:17 \
+            psql -h localhost -U postgres -d postgres -c \
+              "SELECT count(*) AS usuarios FROM usuarios;"
