@@ -175,7 +175,7 @@ cifrados, ya que el entorno serverless no tiene disco persistente):
   aislada — un fallo en una invocación no tumba el servicio ni afecta a otras
   peticiones (no hay un único proceso que "se caiga"). `GET /api/health`
   sigue existiendo como endpoint de diagnóstico (verifica conexión a BD) para
-  monitoreo externo y como primera parada del `RUNBOOK.md` (Avance #6).
+  monitoreo externo y como primera parada del [`RUNBOOK.md`](RUNBOOK.md).
 - **Cero credenciales en el repo**: las variables de `.env.example` se
   inyectan como variables de entorno directamente en Netlify (nunca se sube
   un `.env` real).
@@ -183,6 +183,14 @@ cifrados, ya que el entorno serverless no tiene disco persistente):
   se dispara únicamente cuando un Pull Request se fusiona a `main` (con CI en
   verde) — aplica las migraciones contra Neon y publica el build en Netlify
   sin pasos manuales.
+- **Trazabilidad avanzada**: cada petición recibe un Correlation ID
+  (`x-request-id`); los logs son JSON estructurado y, si el sistema falla de
+  verdad, el usuario sólo ve `"Ocurrió un error. Reporte el código: [UUID]"`
+  — nunca detalles internos (`src/lib/logger.ts`).
+- **Respaldo automatizado (regla 3-2-1)**: `.github/workflows/backup.yml`
+  respalda Neon diariamente a un artefacto de GitHub Actions y verifica en el
+  mismo job que el respaldo restaura correctamente. Procedimiento de
+  recuperación completo en [`RUNBOOK.md`](RUNBOOK.md).
 
 ---
 
@@ -213,3 +221,5 @@ en el navegador para explorar la documentación de `auth`, `crypto`, `access`,
 
 Detalles de arquitectura interna y convenciones de contribución en
 [`CONTRIBUTING.md`](CONTRIBUTING.md). Bitácora de cambios en [`CHANGELOG.md`](CHANGELOG.md).
+Guía operativa ante incidentes (diagnóstico, rollback, recuperación de
+desastres) en [`RUNBOOK.md`](RUNBOOK.md).

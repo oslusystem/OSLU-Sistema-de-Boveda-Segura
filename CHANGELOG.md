@@ -51,6 +51,13 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
   con una corrida real: dump → artefacto → `pg_restore` → `SELECT count(*)
   FROM usuarios` devolvió 5, igual que producción (Tarea #30).
 
+### Added (cont.)
+- `RUNBOOK.md`: guía operativa con las 3 fases exigidas — Diagnóstico
+  (healthcheck, búsqueda de incidentes por Correlation ID, estado del CD),
+  Protocolo ante Caídas (niveles L1/L2/L3: triage, rollback vía Netlify o
+  `git revert`, escalado a recuperación de datos), y Recuperación ante
+  Desastres con los comandos exactos ya verificados en la Tarea #30 (Tarea #31).
+
 ## [Avance #5] — Despliegue y auto-recuperación
 
 ### Added
@@ -164,3 +171,4 @@ e incluyen la referencia `(Tarea #NN)` a la tabla de abajo, tal como exige
 | 28 | Validación BlueTeam: esquemas Zod reutilizables, cuid en `[id]`, descriptor facial, sort allow-list | Seguridad |
 | 29 | Workflow de respaldo automatizado (regla 3-2-1) con verificación real de restauración | DevOps |
 | 30 | Fix: `postgres:18` en `backup.yml` (Neon corre PG 18, no 17) | DevOps |
+| 31 | `RUNBOOK.md`: diagnóstico, protocolo ante caídas (L1/L2/L3), recuperación 3-2-1 | Docs |
